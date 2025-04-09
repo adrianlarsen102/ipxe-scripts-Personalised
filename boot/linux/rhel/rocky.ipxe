@@ -2,7 +2,7 @@
 
 isset ${server-ip} || set server-ip 192.168.30.13
 
-set base http://mirror.slu.cz/rocky/9.4/BaseOS/x86_64/os
+set base http://mirror.slu.cz/rocky/9/BaseOS/x86_64/os/
 
 :start
 menu Rocky Linux 9.4 Boot Menu
