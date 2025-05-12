@@ -1,19 +1,19 @@
 #!ipxe
 
-isset ${server-ip} || set server-ip 192.168.30.13
+isset ${server-ip} || set server-ip 172.16.10.200
 
 set base http://mirror.slu.cz/rocky/9/BaseOS/x86_64/os/
 
 :start
-menu Rocky Linux 9.4 Boot Menu
+menu Rocky Linux 9.5 Boot Menu
 item --gap -- -----------------------
-item rocky Rocky Linux 9.4 Install
+item rocky Rocky Linux 9.5 Install
 item --key g goback (G)o back to previous menu
 
 choose version && goto ${version} || goto start
 
 :rocky
-echo "Booting Rocky Linux 9.4"
+echo "Booting Rocky Linux 9.5"
 kernel ${base}/images/pxeboot/vmlinuz initrd=initrd.img inst.repo=${base}
 initrd ${base}/images/pxeboot/initrd.img
 boot

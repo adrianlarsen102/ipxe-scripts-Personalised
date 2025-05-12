@@ -1,5 +1,5 @@
 #!ipxe
-isset ${server-ip} || set server-ip 192.168.30.13
+isset ${server-ip} || set server-ip 172.16.10.200
 
 :start
 menu RHEL

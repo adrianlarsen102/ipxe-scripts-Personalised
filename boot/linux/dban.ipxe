@@ -1,7 +1,7 @@
 #!ipxe
 
 # Set the server IP if not already set
-isset ${server-ip} || set server-ip 192.168.30.13
+isset ${server-ip} || set server-ip 172.16.10.200
 
 # Define the location of the DBAN kernel (dban.bzi)
 set dban_url http://${server-ip}/boot/linux/dban.bzi
