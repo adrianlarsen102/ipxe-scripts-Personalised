@@ -1,99 +1,113 @@
 ---
-- hosts: localhost
+- name: Setup iPXE Boot Server (DHCP, TFTP, Nginx)
+  hosts: all
   become: yes
   tasks:
-    - name: Install required packages
+
+    # Step 1: Update apt and install required packages
+    - name: Update apt and upgrade system
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install necessary packages for DHCP, TFTP, Nginx, and iPXE
       apt:
         name:
+          - isc-dhcp-server
           - tftpd-hpa
-          - apache2
-          - ipxe
+          - nginx
+          - wget
+          - curl
         state: present
 
-    - name: Ensure syslinux is installed
-      apt:
-        name: syslinux
-        state: present
+    # Step 2: Configure DHCP Server
+    - name: Configure ISC DHCP server
+      template:
+        src: dhcpd.conf.j2
+        dest: /etc/dhcp/dhcpd.conf
+      notify:
+        - restart isc-dhcp-server
 
-    - name: Create TFTP and HTTP boot directories
+    - name: Ensure ISC DHCP server is running
+      service:
+        name: isc-dhcp-server
+        state: restarted
+        enabled: yes
+
+    # Step 3: Configure TFTP Server
+    - name: Configure TFTP server
+      template:
+        src: tftpd-hpa.j2
+        dest: /etc/default/tftpd-hpa
+      notify:
+        - restart tftpd-hpa
+
+    - name: Ensure TFTP server is running
+      service:
+        name: tftpd-hpa
+        state: restarted
+        enabled: yes
+
+    # Step 4: Configure Nginx for iPXE HTTP Boot
+    - name: Create Nginx root directory for iPXE
       file:
-        path: /var/www/html/{{ item }}
+        path: /var/www/html/ipxe
         state: directory
         owner: www-data
         group: www-data
         mode: '0755'
 
-    - name: Copy iPXE boot files for both BIOS and UEFI
+    - name: Copy iPXE boot files to Nginx directory
       copy:
-        src: "/usr/lib/ipxe/{{ item }}"
-        dest: "/var/lib/tftpboot/{{ item }}"
-        owner: tftp
-        group: tftp
+        src: "{{ item }}"
+        dest: /var/www/html/ipxe/
         mode: '0644'
       with_items:
-        - undionly.kpxe  # For BIOS
+        - undionly.kpxe
+        - ipxe.efi
+        - boot.ipxe
 
- name: Create iPXE boot menu script
+    - name: Create Nginx configuration for iPXE
+      template:
+        src: ipxe-nginx.conf.j2
+        dest: /etc/nginx/sites-available/ipxe
+      notify:
+        - reload nginx
+
+    - name: Enable iPXE site in Nginx
+      file:
+        src: /etc/nginx/sites-available/ipxe
+        dest: /etc/nginx/sites-enabled/ipxe
+        state: link
+
+    - name: Ensure Nginx is running
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+    # Step 5: Copy iPXE boot menu script
+    - name: Copy iPXE boot menu script
       copy:
-        dest: /var/www/html/boot/menu.ipxe
-        content: |
-          #!ipxe
-          isset ${server-ip} || set server-ip 192.168.30.13
-
-          :start
-          menu iPXE boot menu
-          item --gap --             ------------------------- Operating systems ------------------------------
-          item --key l linux  Choose a (L)inux Distrobution
-          item --key w winpe  Boot to (W)indows PE
-          item --gap --             ----------------------------- Utilities ----------------------------------
-          item --key e ext  (E)xit
-          item --key i san  (i)SCI/Sanboot
-          item --key s shell  EFI (S)hell
-          choose version && goto ${version} || goto start
-
-          :linux
-          chain http://${server-ip}/boot/linux.ipxe
-
-          :winpe
-          chain http://${server-ip}/winpe/boot.ipxe
-
-          :shell
-          chain http://${server-ip}/boot/efi_shell.ipxe
-
-          :ext
-          exit
-
-          :san
-          echo -n root-path: && read netX/root-path
-          sanhook --drive 0x80 ${netX/root-path}
-          sanboot ${netX/root-path} || clear netX/root-path
-          goto start
-          
-        owner: www-data
-        group: www-data
-        mode: '0644'
-
-    - name: Configure TFTP server with verbose logging
-      lineinfile:
-        path: /etc/default/tftpd-hpa
-        regexp: '^TFTP_OPTIONS='
-        line: 'TFTP_OPTIONS="--secure --verbose"'
-      notify: restart tftpd
-
-    - name: Enable and restart TFTP server
-      service:
-        name: tftpd-hpa
-        state: restarted
-        enabled: yes
-
-    - name: Enable and restart Apache2 HTTP server
-      service:
-        name: apache2
-        state: restarted
-        enabled: yes
+        src: boot.ipxe
+        dest: /var/www/html/ipxe/boot.ipxe
+        mode: '0755'
 
   handlers:
-    - name: restart tftpd
+    - name: restart isc-dhcp-server
+      service:
+        name: isc-dhcp-server
+        state: restarted
+        enabled: yes
+
+    - name: restart tftpd-hpa
       service:
         name: tftpd-hpa
         state: restarted
+        enabled: yes
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
+        enabled: yes
